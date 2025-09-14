@@ -14,10 +14,45 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => {
     res.render('index');
 });
-// io.on('connection',(socket)=>{
-//     console.log("New connection");
-//     socket.on('churan',()=>{
-//         io.emit('churan paapdi')
-//     })
-// })
+io.on('connection',(socket)=>{
+    console.log("New connection");
+    if(!players.white){
+        players.white=socket.id
+        socket.emit('playerRole','w')
+    }
+    else if(!players.black){
+        players.black=socket.id
+        socket.emit('playerRole','b')
+    }
+    else{
+        socket.emit('spectatorRole')
+    }
+    socket.on('disconnect',()=>{
+        if(socket.id === players.white){
+            delete players.white
+        }
+        else if(socket.id === players.black){
+            delete players.black
+        }
+    })
+    socket.on("move",(move)=>{
+        try{
+            if(chess.turn() === 'w' && socket.id!== players.white) return
+            if(chess.turn() === 'b' && socket.id!== players.black) return
+            const result = chess.move(move)
+            if(result){
+                currentPlayer = chess.turn()
+                io.emit('move',move)
+                io.emit('boardState',chess.fen())
+            }
+            else{
+                console.log("Invalid move : ",move)
+                socket.emit("invalidMove",move)
+            }
+        }
+        catch(err){
+            console.log(err.message)
+        }
+    })
+})
 server.listen(80)
